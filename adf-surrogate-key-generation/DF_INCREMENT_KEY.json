@@ -1,0 +1,109 @@
+{
+    "name": "DF_INCREMENT_KEY",
+    "properties": {
+        "type": "MappingDataFlow",
+        "typeProperties": {
+            "sources": [
+                {
+                    "dataset": {
+                        "referenceName": "DS_TGTEMP",
+                        "type": "DatasetReference"
+                    },
+                    "name": "READTGTDATA"
+                },
+                {
+                    "dataset": {
+                        "referenceName": "DS_EMPNEW",
+                        "type": "DatasetReference"
+                    },
+                    "name": "SRCDATA"
+                }
+            ],
+            "sinks": [
+                {
+                    "dataset": {
+                        "referenceName": "DS_EMP_FINAL",
+                        "type": "DatasetReference"
+                    },
+                    "name": "SINKLOAD"
+                }
+            ],
+            "transformations": [
+                {
+                    "name": "DUMMYDATA"
+                },
+                {
+                    "name": "AGGEMPDATA"
+                },
+                {
+                    "name": "join1"
+                },
+                {
+                    "name": "GENERATEPK"
+                },
+                {
+                    "name": "FINALSK"
+                },
+                {
+                    "name": "FINALCOLUMNS"
+                },
+                {
+                    "name": "union1"
+                }
+            ],
+            "scriptLines": [
+                "source(output(",
+                "          emp_id as string,",
+                "          name as string,",
+                "          country as string,",
+                "          department as string",
+                "     ),",
+                "     allowSchemaDrift: true,",
+                "     validateSchema: false,",
+                "     ignoreNoFilesFound: false) ~> READTGTDATA",
+                "source(output(",
+                "          name as string,",
+                "          country as string,",
+                "          department as string",
+                "     ),",
+                "     allowSchemaDrift: true,",
+                "     validateSchema: false,",
+                "     ignoreNoFilesFound: false) ~> SRCDATA",
+                "READTGTDATA derive(dummydata = 'dummy') ~> DUMMYDATA",
+                "DUMMYDATA aggregate(groupBy(dummydata),",
+                "     MAXID = max(emp_id)) ~> AGGEMPDATA",
+                "AGGEMPDATA, SRCDATA join(1==1,",
+                "     joinType:'cross',",
+                "     matchType:'exact',",
+                "     ignoreSpaces: false,",
+                "     broadcast: 'auto')~> join1",
+                "join1 keyGenerate(output(emp_id as long),",
+                "     startAt: 1L,",
+                "     stepValue: 1L) ~> GENERATEPK",
+                "GENERATEPK derive(emp_id = toString(toInteger(MAXID) + toInteger(emp_id))) ~> FINALSK",
+                "FINALSK select(mapColumn(",
+                "          emp_id,",
+                "          name,",
+                "          country,",
+                "          department",
+                "     ),",
+                "     skipDuplicateMapInputs: true,",
+                "     skipDuplicateMapOutputs: true) ~> FINALCOLUMNS",
+                "READTGTDATA, FINALCOLUMNS union(byName: true)~> union1",
+                "union1 sink(allowSchemaDrift: true,",
+                "     validateSchema: false,",
+                "     input(",
+                "          emp_id as string,",
+                "          name as string,",
+                "          country as string,",
+                "          department as string",
+                "     ),",
+                "     umask: 0022,",
+                "     preCommands: [],",
+                "     postCommands: [],",
+                "     skipDuplicateMapInputs: true,",
+                "     skipDuplicateMapOutputs: true) ~> SINKLOAD"
+            ]
+        }
+    }
+}
